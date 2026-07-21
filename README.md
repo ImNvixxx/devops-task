@@ -1,124 +1,187 @@
 # DevOps Task 2
 
-## Project Overview
+## Overview
 
-This project demonstrates deploying a FastAPI application with PostgreSQL on Kubernetes using production-oriented best practices.
-
-## Architecture
-
-```
-                 +----------------+
-                 |    Ingress     |
-                 +-------+--------+
-                         |
-                    ClusterIP Service
-                         |
-             +-----------+-----------+
-             |                       |
-        App Pod #1              App Pod #2
-             |                       |
-             +-----------+-----------+
-                         |
-                    PostgreSQL Service
-                         |
-                    PostgreSQL Pod
-                         |
-                         PVC
-```
+This project demonstrates a production-oriented deployment of a **FastAPI** application with **PostgreSQL** on **Kubernetes**. It includes high availability, health checks, rolling updates, monitoring, alerting, backup/restore scripts, and load testing.
 
 ---
 
-## Components
+# Architecture
 
-### Namespace
-
-All resources are deployed inside:
-
-- `devops-task`
-
----
-
-### Application Deployment
-
-Features:
-
-- 2 replicas
-- Rolling Updates
-- Resource Requests/Limits
-- Startup Probe
-- Readiness Probe
-- Liveness Probe
-
----
-
-### Services
-
-- App Service (ClusterIP)
-- PostgreSQL Service (ClusterIP)
-
----
-
-### Configuration
-
-Configuration is managed using:
-
-- ConfigMap
-- Secret
-
----
-
-### Persistent Storage
-
-PostgreSQL uses a PersistentVolumeClaim (PVC).
-
----
-
-### Ingress
-
-Ingress resource exposes the application.
-
-Host:
-
-```
-devops.local
-```
-
-Ingress Class:
-
-```
-nginx
+```text
+                    +----------------------+
+                    |  NGINX Ingress       |
+                    +----------+-----------+
+                               |
+                        ClusterIP Service
+                               |
+                 +-------------+-------------+
+                 |                           |
+           FastAPI Pod #1              FastAPI Pod #2
+                 |                           |
+                 +-------------+-------------+
+                               |
+                      PostgreSQL Service
+                               |
+                         PostgreSQL Pod
+                               |
+                              PVC
 ```
 
 ---
 
-### Database Migration
+# Features
 
-A Kubernetes Job simulates database initialization.
-
-The Job:
-
-- waits for PostgreSQL
-- connects to the database
-- creates the schema_version table
-- inserts initial schema version
+* FastAPI application
+* PostgreSQL database
+* Kubernetes Deployments
+* Rolling Updates
+* Resource Requests & Limits
+* Startup, Readiness and Liveness Probes
+* ConfigMap & Secret
+* PersistentVolumeClaim
+* NGINX Ingress
+* Database Migration Job
+* Prometheus Monitoring
+* Grafana Dashboard
+* Alertmanager
+* Backup & Restore Scripts
+* Load Testing using k6
 
 ---
 
-## Health Checks
+# Repository Structure
 
-### Startup Probe
+```text
+.
+├── app/
+│   ├── Dockerfile
+│   ├── main.py
+│   └── requirements.txt
+│
+├── k8s/
+│   ├── namespace.yaml
+│   ├── secret.yaml
+│   ├── configmap.yaml
+│   ├── postgres-*.yaml
+│   ├── app-*.yaml
+│   ├── ingress.yaml
+│   ├── migration-job.yaml
+│   ├── oom-test.yaml
+│   └── monitoring/
+│       ├── prometheus-*.yaml
+│       ├── grafana-*.yaml
+│       ├── alertmanager-*.yaml
+│       ├── load-test.js
+│       └── RUNBOOK.md
+│
+├── nginx/
+├── prometheus/
+├── scripts/
+│   ├── backup.sh
+│   └── restore.sh
+│
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+# Prerequisites
+
+The following software is required:
+
+* Docker
+* Kubernetes (Minikube or Kind)
+* kubectl
+* NGINX Ingress Controller
+
+Verify installation:
+
+```bash
+docker --version
+kubectl version --client
+```
+
+---
+
+# Build Application Image
+
+If using **Minikube**:
+
+```bash
+eval $(minikube docker-env)
+docker build -t app:latest ./app
+```
+
+If using **Kind**:
+
+```bash
+docker build -t app:latest ./app
+kind load docker-image app:latest
+```
+
+---
+
+# Deploy Application
+
+Deploy all Kubernetes resources:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Wait for deployments:
+
+```bash
+kubectl get pods -n devops-task
+```
+
+Check services:
+
+```bash
+kubectl get svc -n devops-task
+```
+
+Check ingress:
+
+```bash
+kubectl get ingress -n devops-task
+```
+
+---
+
+# Database Migration
+
+Verify migration job:
+
+```bash
+kubectl get jobs -n devops-task
+```
+
+Migration logs:
+
+```bash
+kubectl logs job/db-migration -n devops-task
+```
+
+---
+
+# Health Checks
+
+Startup Probe
 
 ```
 GET /live
 ```
 
-### Readiness Probe
+Readiness Probe
 
 ```
 GET /health/ready
 ```
 
-### Liveness Probe
+Liveness Probe
 
 ```
 GET /live
@@ -126,49 +189,130 @@ GET /live
 
 ---
 
-# Deployment
+# Monitoring
 
-Apply resources:
+Deploy monitoring stack:
 
 ```bash
-kubectl apply -f namespace.yaml
-kubectl apply -f secret.yaml
-kubectl apply -f configmap.yaml
-kubectl apply -f postgres-pvc.yaml
-kubectl apply -f postgres-deployment.yaml
-kubectl apply -f postgres-service.yaml
-kubectl apply -f app-deployment.yaml
-kubectl apply -f app-service.yaml
-kubectl apply -f ingress.yaml
-kubectl apply -f migration-job.yaml
+kubectl apply -f k8s/monitoring/
+```
+
+Port-forward Prometheus:
+
+```bash
+kubectl port-forward -n monitoring svc/prometheus 9091:9090
+```
+
+Open:
+
+```
+http://localhost:9091
+```
+
+Port-forward Grafana:
+
+```bash
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+```
+
+Open:
+
+```
+http://localhost:3000
+```
+
+Application metrics endpoint:
+
+```
+/metrics
+```
+
+---
+
+# Alertmanager
+
+Trigger an alert by scaling the application to zero replicas:
+
+```bash
+kubectl scale deployment app \
+  -n devops-task \
+  --replicas=0
+```
+
+Check Prometheus rules:
+
+```bash
+curl http://localhost:9091/api/v1/rules
+```
+
+Check application logs:
+
+```bash
+kubectl logs -n devops-task -l app=app
+```
+
+---
+
+# Load Testing
+
+Run the k6 load test:
+
+```bash
+k6 run k8s/monitoring/load-test.js
+```
+
+---
+
+# Backup
+
+Create PostgreSQL backup:
+
+```bash
+./scripts/backup.sh
+```
+
+---
+
+# Restore
+
+Restore database:
+
+```bash
+./scripts/restore.sh
 ```
 
 ---
 
 # Validation
 
-Check Pods
+Pods
 
 ```bash
 kubectl get pods -n devops-task
 ```
 
-Check Services
+Services
 
 ```bash
 kubectl get svc -n devops-task
 ```
 
-Check Ingress
+Deployments
+
+```bash
+kubectl get deployments -n devops-task
+```
+
+Ingress
 
 ```bash
 kubectl get ingress -n devops-task
 ```
 
-Migration Logs
+PVC
 
 ```bash
-kubectl logs job/db-migration -n devops-task
+kubectl get pvc -n devops-task
 ```
 
 ---
@@ -177,67 +321,58 @@ kubectl logs job/db-migration -n devops-task
 
 ## 1. Service Selector Failure
 
-The Service selector was intentionally modified.
-
-Result:
-
-- Service lost all endpoints
-- Application became unreachable
-
 Validation:
 
 ```bash
 kubectl get endpoints -n devops-task
 ```
 
+Expected:
+
+* Service has no endpoints.
+* Application becomes unavailable.
+
 ---
 
 ## 2. Rolling Update
 
-Deployment was updated.
+Trigger rollout:
 
-Observed:
-
-- Zero downtime
-- Pods replaced gradually
-- New Pods became Ready before old Pods terminated
+```bash
+kubectl rollout restart deployment/app \
+  -n devops-task
+```
 
 Validation:
 
 ```bash
-kubectl rollout status deployment/app -n devops-task
+kubectl rollout status deployment/app \
+  -n devops-task
 ```
+
+Expected:
+
+* Zero downtime
+* New Pods become Ready before old Pods terminate.
 
 ---
 
-## 3. Resource Limit / OOMKilled
+## 3. OOMKilled
 
-A dedicated deployment (`oom-test`) was created with:
-
-```
-Request:
-16Mi
-
-Limit:
-32Mi
-```
-
-A Python process continuously allocated memory.
-
-Observed:
-
-- Exit Code 137
-- OOMKilled
-- CrashLoopBackOff
-- Automatic restart
-
-Validation:
+Deploy stress workload:
 
 ```bash
-kubectl describe pod <oom-pod> -n devops-task
+kubectl apply -f k8s/oom-test.yaml
 ```
 
-Expected output:
+Describe pod:
+
+```bash
+kubectl describe pod <OOM_POD_NAME> \
+  -n devops-task
+```
+
+Expected:
 
 ```
 Reason: OOMKilled
@@ -248,49 +383,39 @@ Exit Code: 137
 
 ## 4. Rollback
 
-Deployment rollback was executed.
-
-Validation:
+Rollback deployment:
 
 ```bash
-kubectl rollout undo deployment/app -n devops-task
-
-kubectl rollout status deployment/app -n devops-task
+kubectl rollout undo deployment/app \
+  -n devops-task
 ```
 
-Result:
+Verify:
 
-Deployment successfully restored to the previous stable revision.
-
----
-
-# Monitoring
-
-The application exposes Prometheus metrics at:
-
-```
-/metrics
+```bash
+kubectl rollout status deployment/app \
+  -n devops-task
 ```
 
 ---
 
 # Technologies
 
-- Kubernetes
-- FastAPI
-- PostgreSQL
-- Prometheus Client
-- Docker
-- Python 3.12
+* Kubernetes
+* Docker
+* FastAPI
+* PostgreSQL
+* Python 3.12
+* Prometheus
+* Grafana
+* Alertmanager
+* NGINX Ingress
+* k6
 
-## Running SVC/Prometheus on port 9091
+---
 
-- kubectl port-forward -n monitoring svc/prometheus 9091:9090
-- http://localhost:9091/targets
-## Alert Messenger Test
+# Author
 
-kubectl scale deployment app -n devops-task --replicas=0
+**Navid Mardani**
 
-curl http://localhost:9090/api/v1/rules
-
-kubectl logs -n devops-task -l app=app
+GitHub: https://github.com/ImNvixxx
