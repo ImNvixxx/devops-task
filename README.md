@@ -143,17 +143,16 @@ Adjust the values if your database configuration is different.
 ```bash
 eval $(minikube docker-env)
 
-docker build -t app:latest ./app
+docker build -t devops-task-2-app:latest ./app
 ```
 
 ### Kind
 
 ```bash
-docker build -t app:latest ./app
+docker build -t devops-task-2-app:latest ./app
 
-kind load docker-image app:latest
+kind load docker-image devops-task-2-app:latest
 ```
-
 ---
 
 ## 4. Deploy the application
