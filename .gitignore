@@ -1,0 +1,11 @@
+.env
+backups/
+*.sql.gz
+__pycache__/
+*.pyc
+*.log
+*.tar
+.vscode/
+.idea/
+
+.DS_Store

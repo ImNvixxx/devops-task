@@ -1,0 +1,75 @@
+apiVersion: batch/v1
+kind: Job
+
+metadata:
+  name: db-migration
+  namespace: devops-task
+
+spec:
+  backoffLimit: 3
+
+  template:
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: migration
+          image: postgres:16
+
+          env:
+            - name: DB_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_HOST
+
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: DB_NAME
+
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+          command:
+            - /bin/sh
+            - -c
+            - |
+              export PGPASSWORD=$DB_PASSWORD
+
+              echo "Waiting for PostgreSQL..."
+
+              until pg_isready -h $DB_HOST -U $DB_USER -d $DB_NAME
+              do
+                sleep 2
+              done
+
+              echo "Running migration..."
+
+              psql \
+                -h $DB_HOST \
+                -U $DB_USER \
+                -d $DB_NAME <<EOF
+
+              CREATE TABLE IF NOT EXISTS schema_version (
+                version INT PRIMARY KEY,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              );
+
+              INSERT INTO schema_version(version)
+              VALUES (1)
+              ON CONFLICT (version) DO NOTHING;
+
+              EOF
+
+              echo "Migration completed."

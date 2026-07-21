@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: app-config
+  namespace: devops-task
+
+data:
+  DB_HOST: postgres
+  DB_NAME: appdb
+  POSTGRES_DB: appdb

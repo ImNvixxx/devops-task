@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: oom-test
+  namespace: devops-task
+
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: oom-test
+
+  template:
+    metadata:
+      labels:
+        app: oom-test
+
+    spec:
+      containers:
+        - name: memory-hog
+          image: python:3.12-slim
+
+          command:
+            - python
+            - -c
+            - |
+              import time
+
+              data = []
+
+              while True:
+                  data.append("A" * 1024 * 1024)
+                  print(f"Allocated {len(data)} MB")
+                  time.sleep(0.05)
+
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "16Mi"
+
+            limits:
+              cpu: "100m"
+              memory: "32Mi"

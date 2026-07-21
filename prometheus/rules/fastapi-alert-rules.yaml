@@ -1,0 +1,11 @@
+groups:
+- name: fastapi-alerts
+  rules:
+  - alert: FastAPIInstanceDown
+    expr: up{job="fastapi"} == 0
+    for: 30s
+    labels:
+      severity: critical
+    annotations:
+      summary: "FastAPI application is down"
+      description: "FastAPI instance {{ $labels.instance }} is unreachable"

@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+
+metadata:
+  name: alertmanager-config
+  namespace: monitoring
+
+data:
+  alertmanager.yml: |
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: "fastapi-webhook"
+
+    receivers:
+      - name: "fastapi-webhook"
+        webhook_configs:
+          - url: "http://app.devops-task.svc.cluster.local:8000/alerts"
